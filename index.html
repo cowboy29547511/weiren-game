@@ -1,0 +1,667 @@
+﻿<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>恐怖追殺：偽人與自由</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: 'Courier New', Courier, monospace;
+            user-select: none;
+        }
+
+        #gameContainer {
+            position: relative;
+            width: 1024px;
+            height: 768px;
+            box-shadow: 0 0 100px #000;
+            border: 2px solid #333;
+            cursor: none;
+            overflow: hidden;
+        }
+
+        /* 雜訊濾鏡 */
+        #noise {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIj48ZmlsdGVyIGlkPSJnoiPjxmZVR1cmJ1bGVuY2UgdHlwZT0iZnJhY3RhbE5vaXNlIiBiYXNlRnJlcXVlbmN5PSIwLjg1IiBudW1PY3RhdmVzPSIzIiBzdGl0Y2hUaWxlcz0ic3RpdGNoIi8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsdGVyPSJ1cmwoI2cpIiBvcGFjaXR5PSIwLjEiLz48L3N2Zz4');
+            opacity: 0.15;
+            z-index: 50;
+            animation: noiseAnim 0.2s infinite;
+        }
+
+        @keyframes noiseAnim {
+            0% { transform: translate(0,0); }
+            10% { transform: translate(-5px, 5px); }
+            20% { transform: translate(5px, -5px); }
+            30% { transform: translate(-5px, -5px); }
+            100% { transform: translate(0,0); }
+        }
+
+        canvas {
+            display: block;
+            background: #020202; /* 極黑背景 */
+        }
+
+        /* UI 層 */
+        #uiLayer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 60;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .hud-text {
+            font-size: 24px;
+            color: #ccc;
+            text-shadow: 2px 2px 0 #000;
+            font-weight: bold;
+            font-family: 'Consolas', monospace;
+        }
+
+        /* Boss 血條 */
+        #bossBarContainer {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 600px;
+            display: none;
+            z-index: 70;
+        }
+        
+        #bossName {
+            color: #ff0000;
+            font-size: 20px;
+            letter-spacing: 5px;
+            margin-bottom: 5px;
+            text-align: center;
+            font-weight: bold;
+            text-shadow: 0 0 10px #ff0000;
+        }
+
+        .hp-track {
+            width: 100%;
+            height: 20px;
+            background: #100;
+            border: 2px solid #500;
+            box-shadow: 0 0 15px #f00;
+        }
+
+        #hpFill {
+            width: 100%;
+            height: 100%;
+            background: #a00;
+            transition: width 0.1s;
+        }
+
+        /* 覆蓋層 */
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.95);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        .title {
+            font-size: 70px;
+            color: #a00;
+            font-weight: bold;
+            text-shadow: 4px 4px 0 #000;
+            margin-bottom: 20px;
+            font-family: 'Impact', sans-serif;
+            letter-spacing: 5px;
+            max-width: 90%;
+        }
+
+        .subtitle {
+            font-size: 24px;
+            color: #888;
+            margin-bottom: 40px;
+            max-width: 80%;
+            line-height: 1.5;
+        }
+
+        .btn {
+            padding: 15px 40px;
+            font-size: 30px;
+            background: #222;
+            color: #fff;
+            border: 2px solid #666;
+            cursor: pointer;
+            font-family: 'Courier New', Courier, monospace;
+            transition: 0.2s;
+        }
+        .btn:hover { background: #444; box-shadow: 0 0 20px #fff; }
+
+    </style>
+</head>
+<body>
+
+<div id="gameContainer">
+    <div id="noise"></div>
+    <canvas id="gameCanvas" width="1024" height="768"></canvas>
+    
+    <div id="uiLayer">
+        <div class="hud-text" id="timeText">TIME: 00.0s</div>
+        <div class="hud-text" id="itemText" style="float:right; color:#ffcc00">SOCK: 10s</div>
+    </div>
+
+    <div id="bossBarContainer">
+        <div id="bossName">THE MIMIC</div>
+        <div class="hp-track"><div id="hpFill"></div></div>
+    </div>
+
+    <div id="overlay">
+        <div class="title" id="endTitle">THE ALTERNATE</div>
+        <div class="subtitle" id="endSub">當它靠近時，快逃。<br>撿起襪子讓它感受恐懼。</div>
+        <button class="btn" onclick="initAudioAndStart()">START GAME</button>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const ui = {
+        time: document.getElementById('timeText'),
+        item: document.getElementById('itemText'),
+        boss: document.getElementById('bossBarContainer'),
+        hp: document.getElementById('hpFill'),
+        overlay: document.getElementById('overlay'),
+        title: document.getElementById('endTitle'),
+        sub: document.getElementById('endSub')
+    };
+
+    const playerImg = new Image();
+    playerImg.src = 'IMG20210402151748.png';
+
+    // --- 音效系統 ---
+    const AudioSys = {
+        ctx: null,
+        init: function() {
+            window.AudioContext = window.AudioContext || window.webkitAudioContext;
+            this.ctx = new AudioContext();
+        },
+        playTone: function(freq, type, duration, vol=0.1) {
+            if(!this.ctx) return;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+            gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start();
+            osc.stop(this.ctx.currentTime + duration);
+        },
+        playNoise: function(duration) {
+            if(!this.ctx) return;
+            const bufferSize = this.ctx.sampleRate * duration;
+            const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            const noise = this.ctx.createBufferSource();
+            noise.buffer = buffer;
+            const gain = this.ctx.createGain();
+            gain.gain.value = 0.1;
+            gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+            noise.connect(gain);
+            gain.connect(this.ctx.destination);
+            noise.start();
+        },
+        sfxWalk: () => AudioSys.playTone(80, 'triangle', 0.05, 0.05),
+        sfxPickup: () => { 
+            AudioSys.playTone(600, 'sine', 0.1, 0.2); 
+            setTimeout(()=>AudioSys.playTone(1200, 'sine', 0.3, 0.2), 100); 
+        },
+        sfxHit: () => {
+            AudioSys.playNoise(0.2);
+            AudioSys.playTone(50, 'sawtooth', 0.2, 0.2);
+        },
+        sfxDie: () => {
+            AudioSys.playTone(100, 'sawtooth', 1.0, 0.5);
+            AudioSys.playTone(80, 'sawtooth', 1.0, 0.5);
+        },
+        sfxWin: () => {
+            [523, 659, 783, 1046].forEach((f, i) => setTimeout(() => AudioSys.playTone(f, 'square', 0.8, 0.1), i*200));
+        },
+        sfxTeleport: () => {
+            AudioSys.playNoise(0.5);
+            AudioSys.playTone(1000, 'sawtooth', 0.1, 0.3);
+        }
+    };
+
+    // --- 遊戲參數 ---
+    const PLAYER_SIZE = 260;
+    const PLAYER_HITBOX = 0.25; 
+    
+    let gameState = 'MENU';
+    let startTime = 0;
+    
+    const player = { 
+        x: 0, y: 0, size: PLAYER_SIZE, speed: 6, 
+        powered: false, powerTime: 0,
+        animFrame: 0, 
+        animTimer: 0,
+        isMoving: false
+    };
+    
+    // 偽人怪物
+    const monster = { 
+        x: 0, y: 0, size: 120,
+        speed: 2.8, 
+        hp: 10, maxHp: 10,
+        angle: 0,
+        twitchOffset: {x:0, y:0}, 
+        hitTime: 0 // 累積受傷時間
+    };
+    
+    const sock = { x: 0, y: 0, active: false, timer: 10 };
+    const keys = { w:0, a:0, s:0, d:0 };
+
+    window.addEventListener('keydown', e => keys[e.key.toLowerCase()] = 1);
+    window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = 0);
+
+    function initAudioAndStart() {
+        AudioSys.init();
+        if(AudioSys.ctx.state === 'suspended') AudioSys.ctx.resume();
+        startGame();
+    }
+
+    function startGame() {
+        gameState = 'PLAYING';
+        ui.overlay.style.display = 'none';
+        
+        player.x = canvas.width/2 - PLAYER_SIZE/2;
+        player.y = canvas.height/2 - PLAYER_SIZE/2;
+        player.powered = false;
+        
+        monster.x = 100;
+        monster.y = 100;
+        monster.hp = 10;
+        monster.hitTime = 0;
+        
+        sock.active = false;
+        sock.timer = 10;
+        
+        startTime = Date.now();
+        loop();
+    }
+
+    function loop() {
+        if(gameState !== 'PLAYING') return;
+        update();
+        draw();
+        requestAnimationFrame(loop);
+    }
+
+    function update() {
+        const dt = 1/60;
+        const elapsed = (Date.now() - startTime)/1000;
+        ui.time.innerText = `TIME: ${elapsed.toFixed(1)}s`;
+
+        // 1. 玩家移動
+        let dx = 0, dy = 0;
+        if(keys.w) dy = -1;
+        if(keys.s) dy = 1;
+        if(keys.a) dx = -1;
+        if(keys.d) dx = 1;
+        
+        player.isMoving = (dx !== 0 || dy !== 0);
+
+        if (player.isMoving) {
+            player.animTimer += dt;
+            if (player.animTimer > 0.15) { 
+                player.animFrame = (player.animFrame + 1) % 4; 
+                player.animTimer = 0;
+                if (player.animFrame % 2 === 0) AudioSys.sfxWalk();
+            }
+        } else {
+            player.animFrame = 0; 
+        }
+
+        if(dx && dy) { dx *= 0.707; dy *= 0.707; }
+        player.x += dx * player.speed;
+        player.y += dy * player.speed;
+        
+        player.x = Math.max(-50, Math.min(canvas.width - player.size + 50, player.x));
+        player.y = Math.max(-50, Math.min(canvas.height - player.size + 50, player.y));
+
+        // 2. 怪物 AI
+        const pCx = player.x + player.size/2;
+        const pCy = player.y + player.size/2;
+        const mCx = monster.x + monster.size/2;
+        const mCy = monster.y + monster.size/2;
+        
+        const angle = Math.atan2(pCy - mCy, pCx - mCx);
+        
+        if(player.powered) {
+            // 逃跑
+            monster.x -= Math.cos(angle) * (monster.speed * 0.9);
+            monster.y -= Math.sin(angle) * (monster.speed * 0.9);
+            
+            player.powerTime -= dt;
+            ui.boss.style.display = 'block';
+            ui.hp.style.width = (monster.hp / monster.maxHp * 100) + '%';
+            
+            if(player.powerTime <= 0) {
+                player.powered = false;
+                ui.boss.style.display = 'none';
+                monster.hitTime = 0; // 重置受傷累積
+            }
+        } else {
+            // 追擊
+            monster.x += Math.cos(angle) * monster.speed;
+            monster.y += Math.sin(angle) * monster.speed;
+        }
+
+        monster.x = Math.max(0, Math.min(canvas.width - monster.size, monster.x));
+        monster.y = Math.max(0, Math.min(canvas.height - monster.size, monster.y));
+
+        // 怪物抽蓄
+        if(Math.random() < 0.1) {
+            monster.twitchOffset.x = (Math.random()-0.5) * 10;
+            monster.twitchOffset.y = (Math.random()-0.5) * 10;
+        } else {
+            monster.twitchOffset.x *= 0.5;
+            monster.twitchOffset.y *= 0.5;
+        }
+
+        // 3. 襪子
+        if(!sock.active) {
+            sock.timer -= dt;
+            ui.item.innerText = `SOCK: ${Math.ceil(sock.timer)}s`;
+            if(sock.timer <= 0) {
+                sock.x = 100 + Math.random()*(canvas.width-200);
+                sock.y = 100 + Math.random()*(canvas.height-200);
+                sock.active = true;
+            }
+        } else {
+            ui.item.innerText = "!! ITEM !!";
+        }
+
+        // 4. 碰撞
+        if(sock.active) {
+            const dist = Math.hypot(pCx - sock.x, pCy - sock.y);
+            if(dist < 100) {
+                sock.active = false;
+                player.powered = true;
+                player.powerTime = 20;
+                sock.timer = 40;
+                AudioSys.sfxPickup(); 
+            }
+        }
+
+        const hitDist = (player.size * PLAYER_HITBOX) + (monster.size * 0.4);
+        const distToMonster = Math.hypot(pCx - mCx, pCy - mCy);
+
+        if(distToMonster < hitDist) {
+            if(player.powered) {
+                monster.hp -= dt;
+                monster.hitTime += dt; // 累積受傷時間
+                
+                AudioSys.sfxHit(); 
+                monster.x += (Math.random()-0.5) * 15;
+                monster.y += (Math.random()-0.5) * 15;
+                
+                // 逃脫機制：累積受傷超過 5 秒
+                if (monster.hitTime > 5.0) {
+                    teleportMonster();
+                    monster.hitTime = 0;
+                }
+
+                if(monster.hp <= 0) gameOver(true);
+            } else {
+                gameOver(false);
+            }
+        }
+    }
+
+    function teleportMonster() {
+        // 隨機傳送至遠處
+        let newX, newY, dist;
+        const pCx = player.x + player.size/2;
+        const pCy = player.y + player.size/2;
+        
+        do {
+            newX = Math.random() * (canvas.width - monster.size);
+            newY = Math.random() * (canvas.height - monster.size);
+            dist = Math.hypot(newX - pCx, newY - pCy);
+        } while(dist < 400); // 確保距離夠遠
+
+        monster.x = newX;
+        monster.y = newY;
+        AudioSys.sfxTeleport();
+        
+        // 特效：殘影
+        // (這裡簡化，只用聲音和瞬間移動)
+    }
+
+    function gameOver(win) {
+        gameState = win ? 'WIN' : 'LOSE';
+        ui.overlay.style.display = 'flex';
+        
+        if (win) {
+            ui.title.innerText = "DOBBY IS FREE!";
+            ui.title.style.color = "#ffd700";
+            ui.sub.innerHTML = "MASTER HAS GIVEN DOBBY A SOCK...<br>DOBBY IS FREE!";
+            ui.sub.style.color = "#fff";
+            ui.sub.style.textShadow = "0 0 10px gold";
+            AudioSys.sfxWin();
+        } else {
+            ui.title.innerText = "YOU DIED";
+            ui.title.style.color = "#a00";
+            ui.sub.innerHTML = "你被替換了。<br>沒有人會發現。";
+            AudioSys.sfxDie();
+        }
+    }
+
+    // --- 繪圖 ---
+    function draw() {
+        // 背景更暗，對比度更高
+        ctx.fillStyle = '#050000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // 地板紋理 (深紅暗紋)
+        ctx.strokeStyle = '#1a0505';
+        ctx.lineWidth = 2;
+        for(let i=0; i<canvas.width; i+=100) {
+            ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,canvas.height); ctx.stroke();
+        }
+        for(let i=0; i<canvas.height; i+=100) {
+            ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(canvas.width,i); ctx.stroke();
+        }
+
+        if(sock.active) drawSock(sock.x, sock.y);
+        drawMonster();
+        drawPlayer();
+        
+        // 暈影 (紅色邊緣)
+        let grad = ctx.createRadialGradient(canvas.width/2, canvas.height/2, 300, canvas.width/2, canvas.height/2, 800);
+        grad.addColorStop(0, 'rgba(0,0,0,0)');
+        grad.addColorStop(1, 'rgba(50,0,0,0.6)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+    }
+
+    function drawMonster() {
+        const cx = monster.x + monster.size/2 + monster.twitchOffset.x;
+        const cy = monster.y + monster.size/2 + monster.twitchOffset.y;
+        const time = Date.now() / 150;
+        
+        ctx.save();
+        ctx.translate(cx, cy);
+
+        // 發光外框 (高對比)
+        ctx.shadowColor = '#fff';
+        ctx.shadowBlur = 20;
+
+        // 如果被追殺(害怕)，身體會更扭曲
+        if(player.powered) {
+            ctx.scale(0.9, 0.9);
+            ctx.fillStyle = '#eee'; // 被追殺時變亮，像受驚的靈魂
+        } else {
+            ctx.fillStyle = '#fff'; // 普通狀態也是高亮白色，與黑色背景對比
+        }
+
+        // 1. 身體 (瘦長不自然)
+        ctx.beginPath();
+        const headTilt = Math.sin(time) * 0.2;
+        ctx.rotate(headTilt);
+        ctx.ellipse(0, -50, 25, 35, 0, 0, Math.PI*2); 
+        ctx.fill();
+        ctx.rotate(-headTilt);
+
+        ctx.fillRect(-15, -20, 30, 80);
+
+        ctx.strokeStyle = ctx.fillStyle;
+        ctx.lineWidth = 12;
+        ctx.lineCap = 'round';
+        
+        // 手
+        ctx.beginPath();
+        ctx.moveTo(-15, -10);
+        ctx.quadraticCurveTo(-40, 0, -50 + Math.sin(time*2)*10, 40);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(15, -10);
+        ctx.quadraticCurveTo(40, 0, 50 + Math.cos(time*2)*10, 40);
+        ctx.stroke();
+
+        // 2. 臉部 (極黑，與白色身體對比)
+        ctx.rotate(headTilt); 
+        ctx.shadowBlur = 0; // 臉部五官不發光
+        
+        if(!player.powered) {
+            // 攻擊模式：黑臉白眼
+            ctx.fillStyle = '#000'; // 臉是黑洞
+            ctx.beginPath(); ctx.arc(0, -50, 20, 0, Math.PI*2); ctx.fill();
+
+            ctx.fillStyle = '#fff'; // 眼
+            ctx.beginPath(); ctx.arc(-8, -55, 3, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(8, -55, 3, 0, Math.PI*2); ctx.fill();
+
+            ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; // 嘴
+            ctx.beginPath(); ctx.arc(0, -45, 10, 0, Math.PI, false); ctx.stroke();
+            
+        } else {
+            // 害怕模式：扭曲黑臉
+            ctx.fillStyle = '#000';
+            ctx.beginPath(); ctx.arc(0, -50, 20, 0, Math.PI*2); ctx.fill();
+
+            // 驚恐表情
+            ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.arc(-8, -55, 5, 0, Math.PI*2); ctx.stroke();
+            ctx.beginPath(); ctx.arc(8, -55, 5, 0, Math.PI*2); ctx.stroke();
+            ctx.beginPath(); ctx.ellipse(0, -40, 5, 10, 0, 0, Math.PI*2); ctx.stroke(); // O型嘴
+        }
+
+        ctx.restore();
+    }
+
+    function drawSock(x, y) {
+        const time = Date.now() / 200;
+        const bob = Math.sin(time)*5;
+        ctx.save(); ctx.translate(x, y + bob);
+        let grad = ctx.createLinearGradient(0, -200, 0, 50);
+        grad.addColorStop(0, 'rgba(255,255,255,0)');
+        grad.addColorStop(0.5, 'rgba(255, 200, 100, 0.4)');
+        grad.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = grad; ctx.fillRect(-25, -200, 50, 250);
+        
+        ctx.scale(1.5, 1.5);
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(15, 0); ctx.quadraticCurveTo(20, 20, 30, 30);
+        ctx.lineTo(10, 40); ctx.quadraticCurveTo(0, 40, -5, 30); ctx.lineTo(0, 0);
+        ctx.fillStyle = '#fff'; ctx.shadowColor = '#fff'; ctx.shadowBlur = 15; ctx.fill();
+        ctx.strokeStyle = 'red'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0,5); ctx.lineTo(15,5); ctx.stroke();
+        ctx.strokeStyle = 'blue'; ctx.beginPath(); ctx.moveTo(1,10); ctx.lineTo(16,10); ctx.stroke();
+        ctx.restore();
+    }
+
+    function drawPlayer() {
+        const cx = player.x + player.size/2;
+        const cy = player.y + player.size/2;
+        
+        ctx.save();
+        ctx.translate(cx, cy);
+
+        let rotation = 0;
+        let scaleY = 1;
+        if (player.isMoving) {
+            if (player.animFrame === 0) rotation = -0.1; 
+            else if (player.animFrame === 1) scaleY = 0.95; 
+            else if (player.animFrame === 2) rotation = 0.1; 
+            else if (player.animFrame === 3) scaleY = 0.95; 
+        }
+
+        ctx.rotate(rotation);
+        ctx.scale(1, scaleY);
+
+        // 無敵光環
+        if(player.powered) {
+            const time = Date.now();
+            for(let i=0; i<3; i++) {
+                ctx.beginPath();
+                ctx.arc(0, 0, (player.size/2) + Math.sin(time/100 + i)*20, 0, Math.PI*2);
+                ctx.strokeStyle = `rgba(255, 215, 0, ${0.3 - i*0.1})`;
+                ctx.lineWidth = 10;
+                ctx.stroke();
+            }
+            ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 40;
+        }
+
+        if(playerImg.complete) {
+            ctx.drawImage(playerImg, -player.size/2, -player.size/2, player.size, player.size);
+        } else {
+            ctx.fillStyle = '#0f0';
+            ctx.fillRect(-player.size/2, -player.size/2, player.size, player.size);
+        }
+
+        // --- 倒數計時 ---
+        if(player.powered) {
+            ctx.rotate(-rotation);
+            ctx.scale(1, 1/scaleY);
+            ctx.fillStyle = "#ffd700"; 
+            ctx.strokeStyle = "#000"; 
+            ctx.lineWidth = 4;
+            ctx.font = "bold 60px Arial";
+            ctx.textAlign = "center";
+            const timeLeft = Math.ceil(player.powerTime);
+            const textY = -player.size/2 - 20; 
+            ctx.strokeText(timeLeft, 0, textY);
+            ctx.fillText(timeLeft, 0, textY);
+        }
+
+        ctx.restore();
+    }
+
+</script>
+</body>
+</html>
